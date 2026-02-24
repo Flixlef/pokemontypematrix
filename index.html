@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PKMN Typ-Matrix</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+            --accent: #38bdf8;
+            --danger: #ef4444;
+            --safe: #22c55e;
+            
+            /* Pokémon Typ-Farben */
+            --normal: #A8A77A; --feuer: #EE8130; --wasser: #6390F0; --elektro: #F7D02C;
+            --pflanze: #7AC74C; --eis: #96D9D2; --kampf: #C22E28; --gift: #A33EA1;
+            --boden: #E2BF65; --flug: #A98FF3; --psycho: #F95587; --kaefer: #A6B91A;
+            --gestein: #B6A136; --geist: #735797; --drache: #6F35FC; --stahl: #B7B7CE;
+            --fee: #D685AD; --unlicht: #705746;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--bg); color: var(--text); 
+            margin: 0; padding: 10px; overflow-x: hidden;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        /* Modus-Umschalter */
+        .header {
+            width: 100%; max-width: 500px;
+            display: flex; gap: 10px; margin-bottom: 15px;
+        }
+        .mode-btn {
+            flex: 1; padding: 15px; border-radius: 12px;
+            background: var(--card); border: 2px solid transparent;
+            cursor: pointer; font-size: 24px; text-align: center;
+            transition: 0.2s;
+        }
+        .mode-btn.active { border-color: var(--accent); background: #334155; }
+
+        /* Typen-Auswahl */
+        .selector-grid {
+            display: grid; grid-template-columns: repeat(6, 1fr);
+            gap: 6px; width: 100%; max-width: 500px; margin-bottom: 20px;
+        }
+        .type-icon {
+            aspect-ratio: 1; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 9px; font-weight: bold; cursor: pointer;
+            text-transform: uppercase; border: 2px solid rgba(255,255,255,0.05);
+            color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+        .type-icon.selected { transform: scale(0.9); border: 3px solid white; box-shadow: 0 0 15px rgba(255,255,255,0.4); }
+
+        /* Ergebnisse */
+        #results { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 15px; }
+        .result-group { background: var(--card); border-radius: 12px; padding: 12px; }
+        .result-icons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        
+        .badge {
+            position: relative; width: 55px; height: 35px;
+            border-radius: 6px; display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: bold; text-transform: uppercase; color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+        .multiplier {
+            position: absolute; top: -8px; right: -8px;
+            background: #000; padding: 2px 5px; border-radius: 4px;
+            font-size: 11px; font-weight: 900; border: 1px solid white;
+        }
+
+        /* Status-Rahmen */
+        .x4 { border: 2px solid var(--danger); animation: pulse 1.5s infinite; }
+        .x2 { border: 2px solid var(--danger); }
+        .x05 { border: 2px solid var(--safe); }
+        .x025 { border: 2px solid var(--safe); box-shadow: 0 0 8px var(--safe); }
+        .x0 { opacity: 0.4; filter: grayscale(1); border: 2px solid #fff; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+        
+        /* CSS Klassen für Typen */
+        .normal { background: var(--normal); } .feuer { background: var(--feuer); }
+        .wasser { background: var(--wasser); } .elektro { background: var(--elektro); }
+        .pflanze { background: var(--pflanze); } .eis { background: var(--eis); }
+        .kampf { background: var(--kampf); } .gift { background: var(--gift); }
+        .boden { background: var(--boden); } .flug { background: var(--flug); }
+        .psycho { background: var(--psycho); } .kaefer { background: var(--kaefer); }
+        .gestein { background: var(--gestein); } .geist { background: var(--geist); }
+        .drache { background: var(--drache); } .stahl { background: var(--stahl); }
+        .unlicht { background: var(--unlicht); } .fee { background: var(--fee); }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="mode-btn active" id="btn-atk" onclick="setMode('attack')">⚔️</div>
+        <div class="mode-btn" id="btn-def" onclick="setMode('defense')">🛡️</div>
+    </div>
+
+    <div class="selector-grid" id="typePicker"></div>
+
+    <div id="results"></div>
+
+    <script>
+        // Deutsche Bezeichnungen
+        const types = ["normal", "feuer", "wasser", "elektro", "pflanze", "eis", "kampf", "gift", "boden", "flug", "psycho", "kaefer", "gestein", "geist", "drache", "stahl", "unlicht", "fee"];
+        const labels = {
+            normal: "NORM", feuer: "FEU", wasser: "WAS", elektro: "ELEC", pflanze: "PFL", eis: "EIS", 
+            kampf: "KMPF", gift: "GIFT", boden: "BOD", flug: "FLUG", psycho: "PSY", kaefer: "KÄF", 
+            gestein: "GEST", geist: "GEI", drache: "DRA", stahl: "STAH", unlicht: "UNL", fee: "FEE"
+        };
+
+        // Typen-Tabelle (Angreifer: { Ziel: Multiplikator })
+        const chart = {
+            normal: {gestein: .5, geist: 0, stahl: .5},
+            feuer: {feuer: .5, wasser: .5, pflanze: 2, eis: 2, kaefer: 2, gestein: .5, drache: .5, stahl: 2},
+            wasser: {feuer: 2, wasser: .5, pflanze: .5, boden: 2, gestein: 2, drache: .5},
+            elektro: {wasser: 2, elektro: .5, pflanze: .5, boden: 0, flug: 2, drache: .5},
+            pflanze: {feuer: .5, wasser: 2, pflanze: .5, gift: .5, boden: 2, flug: .5, kaefer: .5, gestein: 2, drache: .5, stahl: .5},
+            eis: {feuer: .5, wasser: .5, pflanze: 2, eis: .5, boden: 2, flug: 2, drache: 2, stahl: .5},
+            kampf: {normal: 2, eis: 2, gift: .5, flug: .5, psycho: .5, kaefer: .5, gestein: 2, geist: 0, unlicht: 2, stahl: 2, fee: .5},
+            gift: {pflanze: 2, gift: .5, boden: .5, gestein: .5, geist: .5, stahl: 0, fee: 2},
+            boden: {feuer: 2, elektro: 2, pflanze: .5, gift: 2, flug: 0, kaefer: .5, gestein: 2, stahl: 2},
+            flug: {elektro: .5, pflanze: 2, kampf: 2, kaefer: 2, gestein: .5, stahl: .5},
+            psycho: {kampf: 2, gift: 2, psycho: .5, unlicht: 0, stahl: .5},
+            kaefer: {feuer: .5, pflanze: 2, kampf: .5, gift: .5, flug: .5, psycho: 2, geist: .5, unlicht: 2, stahl: .5, fee: .5},
+            gestein: {feuer: 2, eis: 2, kampf: .5, boden: .5, flug: 2, kaefer: 2, stahl: .5},
+            geist: {normal: 0, psycho: 2, geist: 2, unlicht: .5},
+            drache: {drache: 2, stahl: .5, fee: 0},
+            stahl: {feuer: .5, wasser: .5, elektro: .5, eis: 2, gestein: 2, stahl: .5, fee: 2},
+            unlicht: {kampf: .5, psycho: 2, geist: 2, unlicht: .5, fee: .5},
+            fee: {feuer: .5, kampf: 2, gift: .5, drache: 2, unlicht: 2, stahl: .5}
+        };
+
+        let currentMode = 'attack';
+        let selected = [];
+
+        function init() {
+            const picker = document.getElementById('typePicker');
+            types.forEach(t => {
+                const div = document.createElement('div');
+                div.className = `type-icon ${t}`;
+                div.innerHTML = labels[t];
+                div.onclick = () => toggleType(t);
+                picker.appendChild(div);
+            });
+        }
+
+        function setMode(m) {
+            currentMode = m;
+            selected = [];
+            document.getElementById('btn-atk').classList.toggle('active', m === 'attack');
+            document.getElementById('btn-def').classList.toggle('active', m === 'defense');
+            updateUI();
+        }
+
+        function toggleType(t) {
+            if (currentMode === 'attack') {
+                selected = [t];
+            } else {
+                if (selected.includes(t)) {
+                    selected = selected.filter(x => x !== t);
+                } else {
+                    if (selected.length >= 2) selected.shift();
+                    selected.push(t);
+                }
+            }
+            updateUI();
+        }
+
+        function updateUI() {
+            document.querySelectorAll('.type-icon').forEach(el => {
+                el.classList.toggle('selected', selected.includes(el.classList[1]));
+            });
+
+            const resDiv = document.getElementById('results');
+            resDiv.innerHTML = '';
+
+            if (selected.length === 0) return;
+
+            if (currentMode === 'attack') {
+                renderAttack(selected[0]);
+            } else {
+                renderDefense(selected);
+            }
+        }
+
+        function renderAttack(type) {
+            const data = chart[type] || {};
+            const strong = [], weak = [], immune = [];
+            
+            types.forEach(t => {
+                const eff = data[t] === undefined ? 1 : data[t];
+                if (eff > 1) strong.push(t);
+                if (eff < 1 && eff > 0) weak.push(t);
+                if (eff === 0) immune.push(t);
+            });
+
+            if (strong.length) addGroup('⚡ STARK GEGEN', strong, 'x2');
+            if (weak.length) addGroup('🛡️ SCHWACH GEGEN', weak, 'x05');
+            if (immune.length) addGroup('🚫 KEINE WIRKUNG', immune, 'x0');
+        }
+
+        function renderDefense(selTypes) {
+            const results = {};
+            types.forEach(gegner => {
+                let totalEff = 1;
+                selTypes.forEach(meinTyp => {
+                    const eff = chart[gegner] && chart[gegner][meinTyp] !== undefined ? chart[gegner][meinTyp] : 1;
+                    totalEff *= eff;
+                });
+                if (totalEff !== 1) results[gegner] = totalEff;
+            });
+
+            const sorted = Object.entries(results).sort((a,b) => b[1] - a[1]);
+            const container = document.createElement('div');
+            container.className = 'result-group';
+            container.innerHTML = `<div>🛡️ VERTEIDIGUNG</div>`;
+            
+            const iconWrap = document.createElement('div');
+            iconWrap.className = 'result-icons';
+            
+            sorted.forEach(([type, val]) => {
+                const badge = document.createElement('div');
+                let classMod = val >= 4 ? 'x4' : val >= 2 ? 'x2' : val <= 0 ? 'x0' : val <= 0.25 ? 'x025' : 'x05';
+                badge.className = `badge ${type} ${classMod}`;
+                badge.innerHTML = `${labels[type]}<div class="multiplier">${val}x</div>`;
+                iconWrap.appendChild(badge);
+            });
+            container.appendChild(iconWrap);
+            document.getElementById('results').appendChild(container);
+        }
+
+        function addGroup(label, list, mod) {
+            const group = document.createElement('div');
+            group.className = 'result-group';
+            group.innerHTML = `<div style="font-size: 12px; font-weight: bold; color: var(--accent)">${label}</div>`;
+            const wrap = document.createElement('div');
+            wrap.className = 'result-icons';
+            list.forEach(t => {
+                const b = document.createElement('div');
+                b.className = `badge ${t} ${mod}`;
+                b.innerHTML = labels[t];
+                wrap.appendChild(b);
+            });
+            group.appendChild(wrap);
+            document.getElementById('results').appendChild(group);
+        }
+
+        init();
+    </script>
+</body>
+</html>
